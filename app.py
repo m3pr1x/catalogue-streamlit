@@ -11,7 +11,15 @@ st.markdown("Déposez vos fichiers **codes produit** et **numéros de compte** (
 codes_file  = st.file_uploader("📄 Codes produit",    type=("csv", "xlsx", "xls"))
 compte_file = st.file_uploader("📄 Numéros de compte", type=("csv", "xlsx", "xls"))
 
-col_idx   = st.number_input("🔢 Numéros de Colonne des codes (1 = première) (2 = deuxième) etc ...", min_value=1, value=1)
+col_idx_codes   = st.number_input(
+    "🔢 Numéro de colonne des codes (1 = première, 2 = deuxième, …)",
+    min_value=1, value=1
+)
+col_idx_comptes = st.number_input(                 # ← NEW
+    "🔢 Numéro de colonne des comptes (1 = première, 2 = deuxième, …)",
+    min_value=1, value=1, key="compte_col_idx"
+)
+
 entreprise = st.text_input("🏢 Entreprise", placeholder="DALKIA / EIFFAGE / ITEC…")
 statut     = st.selectbox("📌 Statut", ["", "INCLUDE", "EXCLUDE"])
 
@@ -33,29 +41,33 @@ def today_yyMMdd() -> str:
     return datetime.today().strftime("%y%m%d")
 
 # ───────────────────────────── TRAITEMENT ───────────────────────────
-def generate(dataset, comptes, col, ent, stat):
+def generate(dataset, comptes, col_code, col_compte, ent, stat):
     dstr = today_yyMMdd()
 
     # 1. Extraction des codes produit
     try:
-        codes = (dataset.iloc[:, col - 1]
+        codes = (dataset.iloc[:, col_code - 1]          # ← utilis. col_code (inchangé)
                  .dropna()
                  .astype(str)
                  .str.strip()
                  .tolist())
     except IndexError:
-        st.error("❌ Colonne hors plage.")
+        st.error("❌ Colonne (codes) hors plage.")
         return
     if not codes:
         st.error("❌ Aucun code produit trouvé.")
         return
 
     # 2. Extraction des numéros de compte
-    comptes_list = (comptes.iloc[:, 0]
-                    .dropna()
-                    .astype(str)
-                    .str.strip()
-                    .tolist())
+    try:
+        comptes_list = (comptes.iloc[:, col_compte - 1]   # ← NEW : col_compte
+                        .dropna()
+                        .astype(str)
+                        .str.strip()
+                        .tolist())
+    except IndexError:
+        st.error("❌ Colonne (comptes) hors plage.")
+        return
     if not comptes_list:
         st.error("❌ Aucun numéro de compte trouvé.")
         return
@@ -73,12 +85,11 @@ def generate(dataset, comptes, col, ent, stat):
     data_pcp = df1.to_csv(sep=";", index=False, header=False)
 
     st.download_button(
-    label     = f"📥 DFRXHYBRPCP{dstr}0000",
-    data      = data_pcp,
-    file_name = f"DFRXHYBRPCP{dstr}0000",
-    mime      = "text/plain"
-)
-
+        label     = f"📥 DFRXHYBRPCP{dstr}0000",
+        data      = data_pcp,
+        file_name = f"DFRXHYBRPCP{dstr}0000",
+        mime      = "text/plain"
+    )
 
     # 4. Fichier 2 – AFRXHYBRCMP (acknowledgement)
     ack_cmp = (f"DFRXHYBRCMP{dstr}000068240530IT"
@@ -121,6 +132,13 @@ if st.button("🚀 Générer"):
         try:
             df_codes   = read_any(codes_file)
             df_comptes = read_any(compte_file)
-            generate(df_codes, df_comptes, col_idx, entreprise, statut)
+            generate(
+                df_codes,
+                df_comptes,
+                col_idx_codes,
+                col_idx_comptes,      # ← NEW
+                entreprise,
+                statut
+            )
         except Exception as e:
             st.error(f"❌ Erreur : {e}")
