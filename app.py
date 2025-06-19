@@ -142,8 +142,3 @@ if st.button("🚀 Générer"):
             )
         except Exception as e:
             st.error(f"❌ Erreur : {e}")
-
-                statut
-            )
-        except Exception as e:
-            st.error(f"❌ Erreur : {e}")
