@@ -99,7 +99,8 @@ if page == "Générateur PC":
                            file_name=f"AFRXHYBRCMP{dstr}0000", mime="text/plain")
 
         # Fichier 3 DFRXHYBRCMP
-        cmp_content = f\"PC_{entreprise};PC_{entreprise};PC_PROFILE_{entreprise};{','.join(comptes)};frxProductCatalog:Online\"
+        cmp_content = f"PC_{entreprise};PC_{entreprise};PC_PROFILE_{entreprise};{','.join(comptes)};frxProductCatalog:Online"
+
         st.download_button(f"📥 DFRXHYBRCMP{dstr}0000", cmp_content,
                            file_name=f"DFRXHYBRCMP{dstr}0000", mime="text/plain")
 
