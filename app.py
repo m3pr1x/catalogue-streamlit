@@ -4,12 +4,17 @@ app.py – Générateur PC + page « Mise à jour M2 »
 Ajout d’un sélecteur dans la barre latérale :
     • “Générateur PC” (écran existant)
     • “Mise à jour M2”  (page encore vide, simple retour possible)
+
+Nouveautés :
+    • Sanity check sur la colonne Codes M2 : le code doit être numérique, 6 chiffres.
+      - S'il contient 5 chiffres, ajout d'un zéro en préfixe.
+      - Sinon, la ligne est signalée comme invalide et affichée.
+    • Libellé du sélecteur de colonne codes renommé.
 """
 
 from __future__ import annotations
 import pandas as pd
 from datetime import datetime
-import csv, io
 import streamlit as st
 
 # ─────────────────────────────  GLOBALES  ────────────────────────────
@@ -29,6 +34,18 @@ def read_any(file):
         raise ValueError("Encodage CSV non reconnu")
     return pd.read_excel(file, engine="openpyxl")
 
+def sanitize_code(code: str) -> str | None:
+    """Assure qu'un code est un nombre à 6 chiffres (padding si 5).
+    Retourne le code nettoyé ou None si invalide."""
+    code = str(code).strip()
+    if not code.isdigit():
+        return None
+    if len(code) == 5:
+        code = code.zfill(6)
+    if len(code) != 6:
+        return None
+    return code
+
 # ───────────────────────  SIDEBAR NAVIGATION  ────────────────────────
 page = st.sidebar.radio("Navigation", ["Générateur PC", "Mise à jour M2"])
 
@@ -41,7 +58,8 @@ if page == "Générateur PC":
     with st.container():
         codes_file = st.file_uploader("📄 Codes produit", type=("csv", "xlsx", "xls"))
         col_idx_codes = (
-            st.number_input("🔢 Colonne codes (1=A)", 1, 50, 1, key="codes_col")
+            st.number_input("🔢 Veulliez indiquer le numéro de la colone des Codes M2",
+                            1, 50, 1, key="codes_col")
             if codes_file else None
         )
 
@@ -70,13 +88,24 @@ if page == "Générateur PC":
 
         # extraction & contrôles
         try:
-            codes = (df_codes.iloc[:, col_idx_codes-1].dropna().astype(str).str.strip())
+            raw_codes = (df_codes.iloc[:, col_idx_codes-1].dropna().astype(str).str.strip())
             comptes = (df_comptes.iloc[:, col_idx_comptes-1].dropna().astype(str).str.strip())
         except IndexError:
             st.error("❌ Indice de colonne hors plage."); st.stop()
 
-        if codes.empty or comptes.empty:
+        if raw_codes.empty or comptes.empty:
             st.error("❌ Aucune donnée trouvée."); st.stop()
+
+        # -------- SANITY CHECK CODES M2 --------
+        sanitized_codes = raw_codes.apply(sanitize_code)
+        invalid_mask = sanitized_codes.isna()
+
+        if invalid_mask.any():
+            st.error(f"❌ {invalid_mask.sum()} code(s) invalide(s) détecté(s) :")
+            st.dataframe(raw_codes[invalid_mask].to_frame(name="Code fourni"))
+            st.stop()
+
+        codes = sanitized_codes  # tous valides et formatés
 
         dstr = today_yyMMdd()
 
@@ -85,7 +114,7 @@ if page == "Générateur PC":
             0: [f"PC_PROFILE_{entreprise}"] * len(codes),
             1: [statut] * len(codes),
             2: [None] * len(codes),
-            3: [f"M2_{c[:6]}" for c in codes],
+            3: [f"M2_{c}" for c in codes],
             4: ["frxProductCatallog:Online"] * len(codes)
         }).drop_duplicates()
 
